@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  jira-agent-api:
+    build: .
+    container_name: jira-agent-api
+    ports:
+      - "8000:8000"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - JIRA_BASE_URL=${JIRA_BASE_URL}
+      - JIRA_USERNAME=${JIRA_USERNAME}
+      - JIRA_PAT=${JIRA_PAT}
+    volumes:
+      - ./logs:/app/logs
+      - ./jira_attachments:/app/jira_attachments
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  jira-agent-scheduler:
+    build: .
+    container_name: jira-agent-scheduler
+    command: python -m src.automation.scheduler
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - JIRA_BASE_URL=${JIRA_BASE_URL}
+      - JIRA_USERNAME=${JIRA_USERNAME}
+      - JIRA_PAT=${JIRA_PAT}
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    depends_on:
+      - jira-agent-api
+
