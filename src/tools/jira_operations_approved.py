@@ -26,12 +26,13 @@ def create_ticket_with_approval(
     assignee: Optional[str] = None,
     priority: Optional[str] = None,
     labels: Optional[List[str]] = None,
-    custom_fields: Optional[Dict[str, Any]] = None
-) -> ApprovalRequest:
+    custom_fields: Optional[Dict[str, Any]] = None) -> ApprovalRequest:
     """
     Create a ticket approval request. Returns approval request, does NOT create ticket.
     User must approve before ticket is created.
     """
+    logger.info("create_ticket_with_approval called for project_key=%s, summary=%s", project_key, summary)
+
     preview = {
         "project": project_key,
         "summary": summary,
@@ -52,10 +53,12 @@ def create_ticket_with_approval(
     )
     
     logger.info("Created approval request for ticket creation: %s", approval.request_id)
+    logger.info("create_ticket_with_approval completed for request_id=%s", approval.request_id)
     return approval
 
 
 def execute_create_ticket(approval_request_id: str) -> str:
+    logger.info("execute_create_ticket called for approval_request_id=%s", approval_request_id)
     """
     Execute ticket creation after approval.
     
@@ -90,6 +93,7 @@ def execute_create_ticket(approval_request_id: str) -> str:
     )
     
     logger.info("Ticket created after approval: %s", ticket_key)
+    logger.info("execute_create_ticket completed for ticket_key=%s", ticket_key)
     return ticket_key
 
 
@@ -106,6 +110,8 @@ def update_ticket_with_approval(
     """
     Create an update approval request. Returns approval request, does NOT update ticket.
     """
+    logger.info("update_ticket_with_approval called for ticket_key=%s", ticket_key)
+
     # Get current ticket details for comparison
     try:
         current = get_ticket_details(ticket_key)
@@ -149,10 +155,12 @@ def update_ticket_with_approval(
     )
     
     logger.info("Created approval request for ticket update: %s", approval.request_id)
+    logger.info("update_ticket_with_approval completed for request_id=%s", approval.request_id)
     return approval
 
 
 def execute_update_ticket(approval_request_id: str) -> bool:
+    logger.info("execute_update_ticket called for approval_request_id=%s", approval_request_id)
     """Execute ticket update after approval."""
     if not approval_manager.is_approved(approval_request_id):
         raise ValueError(f"Approval request {approval_request_id} not approved")
@@ -182,6 +190,7 @@ def execute_update_ticket(approval_request_id: str) -> bool:
     )
     
     logger.info("Ticket updated after approval: %s", ticket_key)
+    logger.info("execute_update_ticket completed for ticket_key=%s", ticket_key)
     return success
 
 
@@ -191,6 +200,8 @@ def transition_ticket_with_approval(
     comment: Optional[str] = None
 ) -> ApprovalRequest:
     """Create a transition approval request."""
+    logger.info("transition_ticket_with_approval called for ticket_key=%s, target_status=%s", ticket_key, target_status)
+
     try:
         current = get_ticket_details(ticket_key)
     except Exception as e:
@@ -216,10 +227,12 @@ def transition_ticket_with_approval(
     )
     
     logger.info("Created approval request for ticket transition: %s", approval.request_id)
+    logger.info("transition_ticket_with_approval completed for request_id=%s", approval.request_id)
     return approval
 
 
 def execute_transition_ticket(approval_request_id: str) -> bool:
+    logger.info("execute_transition_ticket called for approval_request_id=%s", approval_request_id)
     """Execute ticket transition after approval."""
     if not approval_manager.is_approved(approval_request_id):
         raise ValueError(f"Approval request {approval_request_id} not approved")
@@ -243,10 +256,12 @@ def execute_transition_ticket(approval_request_id: str) -> bool:
     )
     
     logger.info("Ticket transitioned after approval: %s", preview["ticket_key"])
+    logger.info("execute_transition_ticket completed for ticket_key=%s", preview["ticket_key"])
     return success
 
 
 def assign_ticket_with_approval(ticket_key: str, assignee: str) -> ApprovalRequest:
+    logger.info("assign_ticket_with_approval called for ticket_key=%s, assignee=%s", ticket_key, assignee)
     """Create an assignment approval request."""
     try:
         current = get_ticket_details(ticket_key)
@@ -272,10 +287,12 @@ def assign_ticket_with_approval(ticket_key: str, assignee: str) -> ApprovalReque
     )
     
     logger.info("Created approval request for ticket assignment: %s", approval.request_id)
+    logger.info("assign_ticket_with_approval completed for request_id=%s", approval.request_id)
     return approval
 
 
 def execute_assign_ticket(approval_request_id: str) -> bool:
+    logger.info("execute_assign_ticket called for approval_request_id=%s", approval_request_id)
     """Execute ticket assignment after approval."""
     if not approval_manager.is_approved(approval_request_id):
         raise ValueError(f"Approval request {approval_request_id} not approved")
@@ -298,10 +315,12 @@ def execute_assign_ticket(approval_request_id: str) -> bool:
     )
     
     logger.info("Ticket assigned after approval: %s", preview["ticket_key"])
+    logger.info("execute_assign_ticket completed for ticket_key=%s", preview["ticket_key"])
     return success
 
 
 def add_comment_with_approval(ticket_key: str, comment_body: str, visibility: Optional[str] = None) -> ApprovalRequest:
+    logger.info("add_comment_with_approval called for ticket_key=%s", ticket_key)
     """Create a comment approval request."""
     preview = {
         "ticket_key": ticket_key,
@@ -319,10 +338,12 @@ def add_comment_with_approval(ticket_key: str, comment_body: str, visibility: Op
     )
     
     logger.info("Created approval request for comment: %s", approval.request_id)
+    logger.info("add_comment_with_approval completed for request_id=%s", approval.request_id)
     return approval
 
 
 def execute_add_comment(approval_request_id: str) -> bool:
+    logger.info("execute_add_comment called for approval_request_id=%s", approval_request_id)
     """Execute comment addition after approval."""
     if not approval_manager.is_approved(approval_request_id):
         raise ValueError(f"Approval request {approval_request_id} not approved")
@@ -346,5 +367,6 @@ def execute_add_comment(approval_request_id: str) -> bool:
     )
     
     logger.info("Comment added after approval to ticket: %s", preview["ticket_key"])
+    logger.info("execute_add_comment completed for ticket_key=%s", preview["ticket_key"])
     return success
 

@@ -41,6 +41,8 @@ def create_ticket(
     Returns:
         Ticket key (e.g., "PROJ-123")
     """
+    logger.info("create_ticket called for project_key=%s, summary=%s", project_key, summary)
+
     logger.info("Creating ticket in project %s: %s", project_key, summary)
     try:
         jira = get_jira_client()
@@ -63,6 +65,7 @@ def create_ticket(
         
         new_issue = jira.create_issue(fields=issue_dict)
         logger.info("Created ticket: %s", new_issue.key)
+        logger.info("create_ticket completed for ticket_key=%s", new_issue.key)
         return new_issue.key
     except JIRAError as e:
         logger.error("Failed to create ticket: %s", e)
@@ -75,12 +78,15 @@ def create_ticket_from_template(
     template_data: Dict[str, Any]
 ) -> str:
     """Create a ticket from a predefined template."""
+    
     logger.info("Creating ticket from template %s", template_name)
     # This would use LLM to generate ticket details from template
     # For now, basic implementation
     summary = template_data.get('summary', '')
     description = template_data.get('description', '')
-    return create_ticket(project_key, summary, description, **template_data)
+    result = create_ticket(project_key, summary, description, **template_data)
+    logger.info("create_ticket_from_template completed for project_key=%s, template_name=%s", project_key, template_name)
+    return result
 
 
 # ==================== TICKET UPDATES ====================
@@ -128,6 +134,7 @@ def update_ticket(
         if status:
             transition_ticket(ticket_key, status)
         
+        logger.info("update_ticket completed for ticket_key=%s", ticket_key)
         return True
     except JIRAError as e:
         logger.error("Failed to update ticket %s: %s", ticket_key, e)
@@ -135,6 +142,7 @@ def update_ticket(
 
 
 def transition_ticket(ticket_key: str, target_status: str, comment: Optional[str] = None) -> bool:
+    logger.info("transition_ticket called for ticket_key=%s, target_status=%s", ticket_key, target_status)
     """
     Transition a ticket to a new status.
     
@@ -171,6 +179,7 @@ def transition_ticket(ticket_key: str, target_status: str, comment: Optional[str
         # Perform transition
         jira.transition_issue(issue, transition_id, comment=comment)
         logger.info("Successfully transitioned ticket %s to %s", ticket_key, target_status)
+        logger.info("transition_ticket completed for ticket_key=%s, target_status=%s", ticket_key, target_status)
         return True
     except JIRAError as e:
         logger.error("Failed to transition ticket %s: %s", ticket_key, e)
@@ -180,6 +189,7 @@ def transition_ticket(ticket_key: str, target_status: str, comment: Optional[str
 # ==================== COMMENTS ====================
 
 def add_comment(ticket_key: str, comment_body: str, visibility: Optional[str] = None) -> bool:
+    logger.info("add_comment called for ticket_key=%s", ticket_key)
     """
     Add a comment to a ticket.
     
@@ -202,6 +212,7 @@ def add_comment(ticket_key: str, comment_body: str, visibility: Optional[str] = 
         
         jira.add_comment(issue, comment_body)
         logger.info("Comment added to ticket: %s", ticket_key)
+        logger.info("add_comment completed for ticket_key=%s", ticket_key)
         return True
     except JIRAError as e:
         logger.error("Failed to add comment to ticket %s: %s", ticket_key, e)
@@ -236,6 +247,7 @@ def bulk_update_tickets(
     
     logger.info("Bulk update completed: %d successful, %d failed", 
                 sum(results.values()), len(results) - sum(results.values()))
+    logger.info("bulk_update_tickets completed: %d successful, %d failed", sum(results.values()), len(results) - sum(results.values()))
     return results
 
 
@@ -256,12 +268,14 @@ def bulk_transition_tickets(
             logger.error("Failed to transition ticket %s: %s", ticket_key, e)
             results[ticket_key] = False
     
+    logger.info("bulk_transition_tickets completed for %d tickets to %s", len(ticket_keys), target_status)
     return results
 
 
 # ==================== SEARCH & QUERY ====================
 
 def search_tickets(jql: str, max_results: int = 50, fields: Optional[List[str]] = None) -> List[Any]:
+    logger.info("search_tickets called with JQL: %s", jql)
     """
     Search tickets using JQL (JIRA Query Language).
     
@@ -278,6 +292,7 @@ def search_tickets(jql: str, max_results: int = 50, fields: Optional[List[str]] 
         jira = get_jira_client()
         issues = jira.search_issues(jql, maxResults=max_results, fields=fields)
         logger.info("Found %d tickets", len(issues))
+        logger.info("search_tickets completed with %d tickets", len(issues))
         return issues
     except JIRAError as e:
         logger.error("Failed to search tickets: %s", e)
@@ -285,6 +300,7 @@ def search_tickets(jql: str, max_results: int = 50, fields: Optional[List[str]] 
 
 
 def get_ticket_details(ticket_key: str, expand: Optional[List[str]] = None) -> Dict[str, Any]:
+    logger.info("get_ticket_details called for ticket_key=%s", ticket_key)
     """
     Get detailed information about a ticket.
     
@@ -301,7 +317,7 @@ def get_ticket_details(ticket_key: str, expand: Optional[List[str]] = None) -> D
         expand_str = ','.join(expand) if expand else None
         issue = jira.issue(ticket_key, expand=expand_str)
         
-        return {
+        result = {
             'key': issue.key,
             'summary': issue.fields.summary,
             'description': issue.fields.description,
@@ -314,6 +330,8 @@ def get_ticket_details(ticket_key: str, expand: Optional[List[str]] = None) -> D
             'labels': issue.fields.labels,
             'comments': [c.body for c in (issue.fields.comment.comments if issue.fields.comment else [])]
         }
+        logger.info("get_ticket_details completed for ticket_key=%s", ticket_key)
+        return result
     except JIRAError as e:
         logger.error("Failed to get ticket details for %s: %s", ticket_key, e)
         raise
@@ -322,12 +340,16 @@ def get_ticket_details(ticket_key: str, expand: Optional[List[str]] = None) -> D
 # ==================== ASSIGNMENT & ROUTING ====================
 
 def assign_ticket(ticket_key: str, assignee: str) -> bool:
+    logger.info("assign_ticket called for ticket_key=%s, assignee=%s", ticket_key, assignee)
     """Assign a ticket to a user."""
     logger.info("Assigning ticket %s to %s", ticket_key, assignee)
-    return update_ticket(ticket_key, assignee=assignee)
+    result = update_ticket(ticket_key, assignee=assignee)
+    logger.info("assign_ticket completed for ticket_key=%s, assignee=%s", ticket_key, assignee)
+    return result
 
 
 def auto_assign_ticket(ticket_key: str, assignment_rules: Dict[str, Any]) -> Optional[str]:
+    logger.info("auto_assign_ticket called for ticket_key=%s", ticket_key)
     """
     Automatically assign a ticket based on rules.
     
@@ -354,11 +376,13 @@ def auto_assign_ticket(ticket_key: str, assignment_rules: Dict[str, Any]) -> Opt
                 assignee = component.lead.name
                 assign_ticket(ticket_key, assignee)
                 logger.info("Auto-assigned ticket %s to %s (component lead)", ticket_key, assignee)
+                logger.info("auto_assign_ticket completed for ticket_key=%s, assignee=%s", ticket_key, assignee)
                 return assignee
         
         # Fallback: round-robin or workload-based assignment
         # This would require additional logic to track workload
         logger.warning("No auto-assignment rule matched for ticket %s", ticket_key)
+        logger.info("auto_assign_ticket completed for ticket_key=%s, no assignment", ticket_key)
         return None
     except Exception as e:
         logger.error("Failed to auto-assign ticket %s: %s", ticket_key, e)
@@ -368,6 +392,7 @@ def auto_assign_ticket(ticket_key: str, assignment_rules: Dict[str, Any]) -> Opt
 # ==================== SLA MONITORING ====================
 
 def check_sla_status(ticket_key: str, sla_hours: int = 24) -> Dict[str, Any]:
+    logger.info("check_sla_status called for ticket_key=%s", ticket_key)
     """
     Check if a ticket is within SLA.
     
@@ -391,7 +416,7 @@ def check_sla_status(ticket_key: str, sla_hours: int = 24) -> Dict[str, Any]:
         hours_remaining = max(0, sla_hours - age_hours) if within_sla else 0
         hours_overdue = max(0, age_hours - sla_hours) if not within_sla else 0
         
-        return {
+        result = {
             'ticket_key': ticket_key,
             'status': issue.fields.status.name,
             'age_hours': age_hours,
@@ -400,12 +425,15 @@ def check_sla_status(ticket_key: str, sla_hours: int = 24) -> Dict[str, Any]:
             'hours_overdue': hours_overdue,
             'sla_threshold_hours': sla_hours
         }
+        logger.info("check_sla_status completed for ticket_key=%s", ticket_key)
+        return result
     except Exception as e:
         logger.error("Failed to check SLA for ticket %s: %s", ticket_key, e)
         raise
 
 
 def find_overdue_tickets(sla_hours: int = 24, status_filter: Optional[str] = None) -> List[Dict[str, Any]]:
+    logger.info("find_overdue_tickets called with SLA: %d hours", sla_hours)
     """
     Find tickets that are overdue based on SLA.
     
@@ -429,6 +457,7 @@ def find_overdue_tickets(sla_hours: int = 24, status_filter: Optional[str] = Non
                 overdue.append(sla_info)
         
         logger.info("Found %d overdue tickets", len(overdue))
+        logger.info("find_overdue_tickets completed: %d overdue tickets", len(overdue))
         return overdue
     except Exception as e:
         logger.error("Failed to find overdue tickets: %s", e)
@@ -438,6 +467,7 @@ def find_overdue_tickets(sla_hours: int = 24, status_filter: Optional[str] = Non
 # ==================== DUPLICATE DETECTION ====================
 
 def find_duplicate_tickets(ticket_key: str, similarity_threshold: float = 0.8) -> List[str]:
+    logger.info("find_duplicate_tickets called for ticket_key=%s", ticket_key)
     """
     Find potentially duplicate tickets using similarity matching.
     
@@ -473,6 +503,7 @@ def find_duplicate_tickets(ticket_key: str, similarity_threshold: float = 0.8) -
                 duplicates.append(similar_issue.key)
         
         logger.info("Found %d potential duplicates for ticket %s", len(duplicates), ticket_key)
+        logger.info("find_duplicate_tickets completed for ticket_key=%s: %d duplicates", ticket_key, len(duplicates))
         return duplicates
     except Exception as e:
         logger.error("Failed to find duplicates for ticket %s: %s", ticket_key, e)
@@ -482,43 +513,50 @@ def find_duplicate_tickets(ticket_key: str, similarity_threshold: float = 0.8) -
 # ==================== PROJECT & USER INFO ====================
 
 def get_project_info(project_key: str) -> Dict[str, Any]:
+    logger.info("get_project_info called for project_key=%s", project_key)
     """Get information about a JIRA project."""
     logger.info("Fetching project info: %s", project_key)
     try:
         jira = get_jira_client()
         project = jira.project(project_key)
         
-        return {
+        result = {
             'key': project.key,
             'name': project.name,
             'lead': project.lead.displayName if project.lead else None,
             'components': [c.name for c in project.components],
             'issue_types': [it.name for it in project.issueTypes]
         }
+        logger.info("get_project_info completed for project_key=%s", project_key)
+        return result
     except JIRAError as e:
         logger.error("Failed to get project info for %s: %s", project_key, e)
         raise
 
 
 def get_user_info(username: str) -> Dict[str, Any]:
+    logger.info("get_user_info called for username=%s", username)
     """Get information about a JIRA user."""
     logger.info("Fetching user info: %s", username)
     try:
         jira = get_jira_client()
         user = jira.user(username)
         
-        return {
+        result = {
             'name': user.name,
             'display_name': user.displayName,
             'email': user.emailAddress if hasattr(user, 'emailAddress') else None,
             'active': user.active if hasattr(user, 'active') else True
         }
+        logger.info("get_user_info completed for username=%s", username)
+        return result
     except JIRAError as e:
         logger.error("Failed to get user info for %s: %s", username, e)
         raise
 
 
 def get_user_workload(username: str) -> Dict[str, int]:
+    logger.info("get_user_workload called for username=%s", username)
     """
     Get workload statistics for a user.
     
@@ -536,6 +574,7 @@ def get_user_workload(username: str) -> Dict[str, int]:
             workload[status] = workload.get(status, 0) + 1
         
         logger.info("User %s workload: %s", username, workload)
+        logger.info("get_user_workload completed for username=%s", username)
         return workload
     except Exception as e:
         logger.error("Failed to get workload for user %s: %s", username, e)

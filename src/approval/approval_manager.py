@@ -43,8 +43,10 @@ class ApprovalManager:
     """Manages approval requests and human-in-the-loop operations."""
     
     def __init__(self):
+        logger.info("ApprovalManager.__init__ called")
         self.pending_approvals: Dict[str, ApprovalRequest] = {}
         self.approval_history: List[ApprovalRequest] = []
+        logger.info("ApprovalManager.__init__ completed")
     
     def create_approval_request(
         self,
@@ -53,6 +55,7 @@ class ApprovalManager:
         description: str = "",
         ticket_key: Optional[str] = None
     ) -> ApprovalRequest:
+        logger.info("ApprovalManager.create_approval_request called with operation_type=%s, ticket_key=%s", operation_type, ticket_key)
         """
         Create a new approval request.
         
@@ -79,10 +82,11 @@ class ApprovalManager:
         
         self.pending_approvals[request_id] = approval
         logger.info("Created approval request %s for operation: %s", request_id, operation_type)
-        
+        logger.info("ApprovalManager.create_approval_request completed for request_id=%s", request_id)
         return approval
     
     def format_approval_message(self, approval: ApprovalRequest) -> str:
+        logger.info("ApprovalManager.format_approval_message called for request_id=%s", approval.request_id)
         """
         Format an approval request as a human-readable message.
         
@@ -111,9 +115,12 @@ class ApprovalManager:
         lines.append("Type 'approve {request_id}' to proceed or 'reject {request_id}' to cancel")
         lines.append(f"{'='*60}\n")
         
-        return "\n".join(lines)
+        result = "\n".join(lines)
+        logger.info("ApprovalManager.format_approval_message completed for request_id=%s", approval.request_id)
+        return result
     
     def approve(self, request_id: str, approved_by: str = "user") -> bool:
+        logger.info("ApprovalManager.approve called for request_id=%s by %s", request_id, approved_by)
         """
         Approve a pending request.
         
@@ -126,20 +133,20 @@ class ApprovalManager:
         """
         if request_id not in self.pending_approvals:
             logger.warning("Approval request %s not found", request_id)
+            logger.info("ApprovalManager.approve completed (not found) for request_id=%s", request_id)
             return False
-        
         approval = self.pending_approvals[request_id]
         approval.status = ApprovalStatus.APPROVED
         approval.approved_by = approved_by
-        
         # Move to history
         self.approval_history.append(approval)
         del self.pending_approvals[request_id]
-        
         logger.info("Approval request %s approved by %s", request_id, approved_by)
+        logger.info("ApprovalManager.approve completed for request_id=%s", request_id)
         return True
     
     def reject(self, request_id: str, reason: str = "", rejected_by: str = "user") -> bool:
+        logger.info("ApprovalManager.reject called for request_id=%s by %s", request_id, rejected_by)
         """
         Reject a pending request.
         
@@ -153,38 +160,46 @@ class ApprovalManager:
         """
         if request_id not in self.pending_approvals:
             logger.warning("Approval request %s not found", request_id)
+            logger.info("ApprovalManager.reject completed (not found) for request_id=%s", request_id)
             return False
-        
         approval = self.pending_approvals[request_id]
         approval.status = ApprovalStatus.REJECTED
         approval.rejection_reason = reason
         approval.approved_by = rejected_by
-        
         # Move to history
         self.approval_history.append(approval)
         del self.pending_approvals[request_id]
-        
         logger.info("Approval request %s rejected by %s: %s", request_id, rejected_by, reason)
+        logger.info("ApprovalManager.reject completed for request_id=%s", request_id)
         return True
     
     def get_approval(self, request_id: str) -> Optional[ApprovalRequest]:
-        """Get an approval request by ID."""
-        return self.pending_approvals.get(request_id)
+        logger.info("ApprovalManager.get_approval called for request_id=%s", request_id)
+        result = self.pending_approvals.get(request_id)
+        logger.info("ApprovalManager.get_approval completed for request_id=%s", request_id)
+        return result
     
     def is_approved(self, request_id: str) -> bool:
-        """Check if a request is approved."""
+        logger.info("ApprovalManager.is_approved called for request_id=%s", request_id)
         approval = self.get_approval(request_id)
         if not approval:
             # Check history
             for hist_approval in self.approval_history:
                 if hist_approval.request_id == request_id:
-                    return hist_approval.status == ApprovalStatus.APPROVED
+                    result = hist_approval.status == ApprovalStatus.APPROVED
+                    logger.info("ApprovalManager.is_approved completed for request_id=%s (from history)", request_id)
+                    return result
+            logger.info("ApprovalManager.is_approved completed for request_id=%s (not found)", request_id)
             return False
-        return approval.status == ApprovalStatus.APPROVED
+        result = approval.status == ApprovalStatus.APPROVED
+        logger.info("ApprovalManager.is_approved completed for request_id=%s", request_id)
+        return result
     
     def get_pending_approvals(self) -> List[ApprovalRequest]:
-        """Get all pending approval requests."""
-        return list(self.pending_approvals.values())
+        logger.info("ApprovalManager.get_pending_approvals called")
+        result = list(self.pending_approvals.values())
+        logger.info("ApprovalManager.get_pending_approvals completed")
+        return result
 
 
 # Global approval manager instance

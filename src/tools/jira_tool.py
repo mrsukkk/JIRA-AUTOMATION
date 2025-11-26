@@ -27,6 +27,7 @@ WORD_EXTENSIONS = {".docx"}  # Removed .doc
 CHUNK_SIZE = 8000  # Characters per chunk for LLM summarization
 
 def get_jira_client():
+    logger.info("get_jira_client called")
     """Initialize and return a Jira client using settings from config."""
     logger.info("Initializing Jira client")
     try:
@@ -35,12 +36,14 @@ def get_jira_client():
             basic_auth=(settings.JIRA_USERNAME, settings.JIRA_PAT)
         )
         logger.debug("Jira client initialized successfully")
+        logger.info("get_jira_client completed")
         return jira
     except JIRAError as e:
         logger.error("Failed to initialize Jira client: %s", e)
         raise
 
 def fetch_tickets_by_status(status: str = None):
+    logger.info("fetch_tickets_by_status called with status=%s", status)
     """
     Fetch tickets assigned to, reported by, or mentioning the current user.
     Optionally filter by status (e.g., 'Closed', 'In Progress').
@@ -114,16 +117,19 @@ def fetch_tickets_by_status(status: str = None):
 
         if output_lines:
             logger.info("Tickets fetched successfully")
+            logger.info("fetch_tickets_by_status completed with tickets found")
             return "\n".join(output_lines)
         else:
             message = f"No tickets found for status '{status}'." if status else "No tickets found."
             logger.info(message)
+            logger.info("fetch_tickets_by_status completed with no tickets found")
             return message
     except Exception as e:
         logger.error("Error fetching tickets: %s", e)
         raise
 
 def summarize_large_text(text: str, llm):
+    logger.info("summarize_large_text called with text length=%d", len(text))
     """Summarize large text by chunking it for LLM processing."""
     logger.info("Summarizing text of length: %d characters", len(text))
     summaries = []
@@ -137,12 +143,14 @@ def summarize_large_text(text: str, llm):
             summaries.append(response.content)
             logger.debug("Chunk summary generated")
         logger.info("Text summarization completed")
+        logger.info("summarize_large_text completed")
         return "\n".join(summaries)
     except Exception as e:
         logger.error("Error summarizing text: %s", e)
         raise
 
 def extract_text_from_attachment(filepath: str, ext: str):
+    logger.info("extract_text_from_attachment called for filepath=%s, ext=%s", filepath, ext)
     """Extract text from various file types (text, PDF, Excel, Word)."""
     logger.info("Extracting text from attachment: %s", filepath)
     try:
@@ -150,6 +158,7 @@ def extract_text_from_attachment(filepath: str, ext: str):
             with open(filepath, "r", encoding="utf-8") as f:
                 content = f.read()
                 logger.debug("Extracted text from %s", filepath)
+                logger.info("extract_text_from_attachment completed for text file: %s", filepath)
                 return content
         elif ext in PDF_EXTENSIONS:
             text = ""
@@ -157,28 +166,34 @@ def extract_text_from_attachment(filepath: str, ext: str):
                 for page in pdf.pages:
                     text += page.extract_text() + "\n"
             logger.debug("Extracted text from PDF: %s", filepath)
+            logger.info("extract_text_from_attachment completed for PDF: %s", filepath)
             return text
         elif ext in EXCEL_EXTENSIONS:
             df = pd.read_excel(filepath, engine='openpyxl' if ext == ".xlsx" else None)
             content = df.to_csv(index=False)
             logger.debug("Converted Excel to CSV: %s", filepath)
+            logger.info("extract_text_from_attachment completed for Excel: %s", filepath)
             return content
         elif ext in WORD_EXTENSIONS:
             try:
                 doc = Document(filepath)
                 content = "\n".join([p.text for p in doc.paragraphs])
                 logger.debug("Extracted text from Word document: %s", filepath)
+                logger.info("extract_text_from_attachment completed for Word: %s", filepath)
                 return content
             except Exception as e:
                 logger.error("Failed to extract from Word: %s", e)
                 return f"(Could not extract content from Word file: {e})"
         logger.warning("Unsupported file extension: %s", ext)
+        logger.info("extract_text_from_attachment completed: unsupported file type %s", ext)
         return "(Unsupported file type)"
     except Exception as e:
         logger.error("Failed to extract text from %s: %s", filepath, e)
+        logger.info("extract_text_from_attachment failed for %s", filepath)
         return f"(Could not extract content: {e})"
 
 def fetch_and_summarize_ticket(ticket_key: str):
+    logger.info("fetch_and_summarize_ticket called for ticket_key=%s", ticket_key)
     """Fetch and summarize a Jira ticket, including comments and attachments."""
     logger.info("Fetching and summarizing ticket: %s", ticket_key)
     os.makedirs(ATTACHMENT_DIR, exist_ok=True)
@@ -240,6 +255,7 @@ def fetch_and_summarize_ticket(ticket_key: str):
             HumanMessage(content=f"Summarize this Jira ticket including all details, comments, attachments, and history:\n\n{raw_text}")
         ])
         logger.info("Ticket %s summarized successfully", ticket_key)
+        logger.info("fetch_and_summarize_ticket completed for ticket_key=%s", ticket_key)
         return response.content
     except JIRAError as e:
         logger.error("JIRA error for ticket %s: %s", ticket_key, e)
@@ -251,12 +267,14 @@ def fetch_and_summarize_ticket(ticket_key: str):
         raise
 
 def fetch_statuses():
+    logger.info("fetch_statuses called")
     """Return all possible Jira statuses (lowercased)."""
     logger.info("Fetching available Jira statuses")
     try:
         jira = get_jira_client()
         statuses = [s.name.lower() for s in jira.statuses()]
         logger.info("Retrieved %d Jira statuses", len(statuses))
+        logger.info("fetch_statuses completed with %d statuses", len(statuses))
         return statuses
     except Exception as e:
         logger.error("Error fetching Jira statuses: %s", e)

@@ -46,6 +46,12 @@ class AgentState(TypedDict):
     pending_approval_id: str | None
     operation_type: str | None  # create, update, transition, assign, comment
 
+    # 🔹 extra fields used by agent_node/approval_node
+    target_ticket_key: str | None
+    target_status: str | None
+    assignee: str | None
+    comment_body: str | None
+
 
 def agent_node(state: AgentState):
     """Process user input and determine the next action. Requires human message."""
@@ -69,7 +75,9 @@ def agent_node(state: AgentState):
         last_msg = messages[-1].content.lower() if messages else ""
         logger.debug("Last message: %s", last_msg)
         
-        # Handle approval commands
+        # ============================================================
+        # 1️⃣ Handle approval commands FIRST
+        # ============================================================
         if "approve" in last_msg:
             parts = last_msg.split()
             approval_id = None
@@ -123,37 +131,130 @@ def agent_node(state: AgentState):
                     "operation_type": None
                 }
         
-        # Check for operation commands
-        statuses = [s.lower() for s in fetch_statuses()]
-        requested_status = None
-        for s in statuses:
-            if s in last_msg:
-                requested_status = s
-                break
-        
-        if "show me my tickets" in last_msg:
-            logger.info("Detected 'show me my tickets' command")
+
+        # ============================================================
+        # 2️⃣ WRITE OPERATIONS MUST COME BEFORE STATUS FILTER
+        # ============================================================
+
+        # --- Write operation detection and mapping ---
+        import re
+        # Extract ticket key (e.g., ESD-242)
+        ticket_key_match = re.search(r"([A-Z][A-Z0-9]+-\d+)", last_msg, re.I)
+        ticket_key = ticket_key_match.group(1).upper() if ticket_key_match else None
+
+        # Robust status transition detection (e.g., 'update ticket status ESD-242 to resume development')
+        transition_patterns = [
+            r"update ticket status ([A-Z][A-Z0-9]+-\d+) to ([\w\s]+)",
+            r"change status of ([A-Z][A-Z0-9]+-\d+) to ([\w\s]+)",
+            r"transition ticket ([A-Z][A-Z0-9]+-\d+) to ([\w\s]+)",
+            r"move ticket ([A-Z][A-Z0-9]+-\d+) to ([\w\s]+)",
+            r"set status of ([A-Z][A-Z0-9]+-\d+) to ([\w\s]+)",
+        ]
+        for pat in transition_patterns:
+            m = re.search(pat, last_msg)
+            if m:
+                tkey = m.group(1).upper()
+                tstatus = m.group(2).strip()
+                return {
+                    "messages": [AIMessage(content=f"To transition ticket {tkey} to '{tstatus}', I will show you a preview for approval.")],
+                    "greeted": state.get("greeted", False),
+                    "status_filter": None,
+                    "ticket_to_summarize": None,
+                    "pending_approval_id": None,
+                    "operation_type": "transition_ticket",
+                    "target_ticket_key": tkey,
+                    "target_status": tstatus
+                }
+
+        # Also handle 'resume development' or 'change status to ...' after a previous update/transition intent
+        if ("change status" in last_msg or "resume development" in last_msg) and ticket_key:
+            # Try to extract the status after 'to' or 'resume'
+            m = re.search(r"(?:to|resume) ([\w\s]+)", last_msg)
+            tstatus = m.group(1).strip() if m else None
+            if tstatus:
+                return {
+                    "messages": [AIMessage(content=f"To transition ticket {ticket_key} to '{tstatus}', I will show you a preview for approval.")],
+                    "greeted": state.get("greeted", False),
+                    "status_filter": None,
+                    "ticket_to_summarize": None,
+                    "pending_approval_id": None,
+                    "operation_type": "transition_ticket",
+                    "target_ticket_key": ticket_key,
+                    "target_status": tstatus
+                }
+
+        # Create
+        if "create ticket" in last_msg or "new ticket" in last_msg:
             return {
-                "messages": [AIMessage(content="Hi! Fetching your tickets...")],
-                "greeted": True,
+                "messages": [AIMessage(content="To create a ticket, please provide: project key, summary, and description. I will show you a preview for approval.")],
+                "greeted": state.get("greeted", False),
                 "status_filter": None,
                 "ticket_to_summarize": None,
                 "pending_approval_id": None,
-                "operation_type": None
+                "operation_type": "create_ticket"
             }
-        
-        elif requested_status:
-            logger.info("Detected status filter: %s", requested_status)
+        # Update
+        if ("update ticket" in last_msg or "modify ticket" in last_msg) and ticket_key:
             return {
-                "messages": [AIMessage(content=f"Fetching tickets with status '{requested_status}'...")],
-                "greeted": True,
-                "status_filter": requested_status,
+                "messages": [AIMessage(content=f"To update ticket {ticket_key}, please specify what to change. I will show you a preview for approval.")],
+                "greeted": state.get("greeted", False),
+                "status_filter": None,
                 "ticket_to_summarize": None,
                 "pending_approval_id": None,
-                "operation_type": None
+                "operation_type": "update_ticket",
+                "target_ticket_key": ticket_key
             }
-        
-        elif "summarize ticket" in last_msg:
+        # Transition (fallback for generic phrases)
+        if ("transition ticket" in last_msg or "move ticket" in last_msg or "change status" in last_msg) and ticket_key:
+            # Try to extract target status after 'to'
+            m = re.search(r"to ([\w\s]+)", last_msg)
+            target_status = m.group(1).strip() if m else None
+            return {
+                "messages": [AIMessage(content=f"To transition ticket {ticket_key}, please specify the target status. I will show you a preview for approval.")],
+                "greeted": state.get("greeted", False),
+                "status_filter": None,
+                "ticket_to_summarize": None,
+                "pending_approval_id": None,
+                "operation_type": "transition_ticket",
+                "target_ticket_key": ticket_key,
+                "target_status": target_status
+            }
+        # Assign
+        if "assign ticket" in last_msg or "reassign ticket" in last_msg:
+            if ticket_key:
+                # Try to extract assignee
+                assignee = parts[-1] if len(parts) > 2 else None
+                return {
+                    "messages": [AIMessage(content=f"To assign ticket {ticket_key}, please specify the assignee. I will show you a preview for approval.")],
+                    "greeted": state.get("greeted", False),
+                    "status_filter": None,
+                    "ticket_to_summarize": None,
+                    "pending_approval_id": None,
+                    "operation_type": "assign_ticket",
+                    "target_ticket_key": ticket_key,
+                    "assignee": assignee
+                }
+        # Add comment
+        if "add comment" in last_msg or "comment on ticket" in last_msg:
+            if ticket_key:
+                # Try to extract comment body (naive)
+                comment_body = last_msg.split("add comment")[-1].strip() if "add comment" in last_msg else ""
+                return {
+                    "messages": [AIMessage(content=f"To add a comment to ticket {ticket_key}, please provide the comment text. I will show you a preview for approval.")],
+                    "greeted": state.get("greeted", False),
+                    "status_filter": None,
+                    "ticket_to_summarize": None,
+                    "pending_approval_id": None,
+                    "operation_type": "add_comment",
+                    "target_ticket_key": ticket_key,
+                    "comment_body": comment_body
+                }
+
+
+        # ============================================================
+        # 3️⃣ Summarization
+        # ============================================================
+        if "summarize ticket" in last_msg:
             parts = last_msg.split()
             ticket_key = next((p for p in parts if "-" in p), None)
             if ticket_key:
@@ -166,33 +267,48 @@ def agent_node(state: AgentState):
                     "pending_approval_id": None,
                     "operation_type": None
                 }
+
+
+        # ============================================================
+        # 4️⃣ STATUS FILTER (moved DOWN so it doesn’t block updates)
+        # ============================================================
+        statuses = [s.lower() for s in fetch_statuses()]
+        requested_status = None
+        for s in statuses:
+            if s in last_msg:
+                requested_status = s
+                break
         
-        # Parse write operations (require approval)
-        elif "create ticket" in last_msg or "new ticket" in last_msg:
-            # Extract ticket details from message (simplified - would use LLM for better parsing)
+        if requested_status:
+            logger.info("Detected status filter: %s", requested_status)
             return {
-                "messages": [AIMessage(content="To create a ticket, please provide: project key, summary, and description. I will show you a preview for approval.")],
-                "greeted": state.get("greeted", False),
+                "messages": [AIMessage(content=f"Fetching tickets with status '{requested_status}'...")],
+                "greeted": True,
+                "status_filter": requested_status,
+                "ticket_to_summarize": None,
+                "pending_approval_id": None,
+                "operation_type": None
+            }
+
+
+        # ============================================================
+        # 5️⃣ Normal "show me my tickets"
+        # ============================================================
+        if "show me my tickets" in last_msg:
+            logger.info("Detected 'show me my tickets' command")
+            return {
+                "messages": [AIMessage(content="Hi! Fetching your tickets...")],
+                "greeted": True,
                 "status_filter": None,
                 "ticket_to_summarize": None,
                 "pending_approval_id": None,
-                "operation_type": "create"
+                "operation_type": None
             }
-        
-        elif "update ticket" in last_msg or "modify ticket" in last_msg:
-            parts = last_msg.split()
-            ticket_key = next((p for p in parts if "-" in p), None)
-            if ticket_key:
-                return {
-                    "messages": [AIMessage(content=f"To update ticket {ticket_key}, please specify what to change. I will show you a preview for approval.")],
-                    "greeted": state.get("greeted", False),
-                    "status_filter": None,
-                    "ticket_to_summarize": None,
-                    "pending_approval_id": None,
-                    "operation_type": "update"
-                }
-        
-        # Default LLM fallback
+
+
+        # ============================================================
+        # 6️⃣ DEFAULT LLM FALLBACK
+        # ============================================================
         logger.debug("Invoking LLM for default response")
         response = llm.invoke(human_messages)
         logger.info("LLM response generated")
@@ -204,6 +320,7 @@ def agent_node(state: AgentState):
             "pending_approval_id": None,
             "operation_type": None
         }
+
     except Exception as e:
         logger.error("Error in agent_node: %s", e)
         raise
@@ -264,17 +381,12 @@ def approval_node(state: AgentState):
         messages = state["messages"]
         last_msg = messages[-1].content if messages else ""
         
-        # This would parse the operation details from the message
-        # For now, simplified example
-        if operation_type == "create":
-            # In real implementation, parse ticket details from message
+        # Route to correct approval function based on operation_type
+        if operation_type == "create_ticket":
+            # TODO: Parse real values from state/messages
             approval = create_ticket_with_approval(
-                project_key="PROJ",  # Would parse from message
-                summary="Example Ticket",  # Would parse from message
-                description="Example description",  # Would parse from message
-                issue_type="Task"
+                project_key="PROJ", summary="Example Ticket", description="Example description", issue_type="Task"
             )
-            
             approval_msg = approval_manager.format_approval_message(approval)
             return {
                 "messages": [AIMessage(content=approval_msg)],
@@ -284,7 +396,57 @@ def approval_node(state: AgentState):
                 "status_filter": None,
                 "ticket_to_summarize": None
             }
-        
+        elif operation_type == "update_ticket":
+            ticket_key = state.get("target_ticket_key")
+            approval = update_ticket_with_approval(ticket_key)
+            approval_msg = approval_manager.format_approval_message(approval)
+            return {
+                "messages": [AIMessage(content=approval_msg)],
+                "pending_approval_id": approval.request_id,
+                "operation_type": operation_type,
+                "greeted": state.get("greeted", False),
+                "status_filter": None,
+                "ticket_to_summarize": None
+            }
+        elif operation_type == "transition_ticket":
+            ticket_key = state.get("target_ticket_key")
+            target_status = state.get("target_status")
+            approval = transition_ticket_with_approval(ticket_key, target_status)
+            approval_msg = approval_manager.format_approval_message(approval)
+            return {
+                "messages": [AIMessage(content=approval_msg)],
+                "pending_approval_id": approval.request_id,
+                "operation_type": operation_type,
+                "greeted": state.get("greeted", False),
+                "status_filter": None,
+                "ticket_to_summarize": None
+            }
+        elif operation_type == "assign_ticket":
+            ticket_key = state.get("target_ticket_key")
+            assignee = state.get("assignee")
+            approval = assign_ticket_with_approval(ticket_key, assignee)
+            approval_msg = approval_manager.format_approval_message(approval)
+            return {
+                "messages": [AIMessage(content=approval_msg)],
+                "pending_approval_id": approval.request_id,
+                "operation_type": operation_type,
+                "greeted": state.get("greeted", False),
+                "status_filter": None,
+                "ticket_to_summarize": None
+            }
+        elif operation_type == "add_comment":
+            ticket_key = state.get("target_ticket_key")
+            comment_body = state.get("comment_body")
+            approval = add_comment_with_approval(ticket_key, comment_body)
+            approval_msg = approval_manager.format_approval_message(approval)
+            return {
+                "messages": [AIMessage(content=approval_msg)],
+                "pending_approval_id": approval.request_id,
+                "operation_type": operation_type,
+                "greeted": state.get("greeted", False),
+                "status_filter": None,
+                "ticket_to_summarize": None
+            }
         return state
     except Exception as e:
         logger.error("Error in approval_node: %s", e)
@@ -330,7 +492,39 @@ def execute_node(state: AgentState):
                         "pending_approval_id": None,
                         "operation_type": None
                     }
-            # Add other operation types...
+            elif operation_type == "transition_ticket":
+                success = execute_transition_ticket(approval_id)
+                if success:
+                    return {
+                        "messages": [AIMessage(content="✅ Ticket transitioned successfully.")],
+                        "greeted": state.get("greeted", False),
+                        "status_filter": None,
+                        "ticket_to_summarize": None,
+                        "pending_approval_id": None,
+                        "operation_type": None
+                    }
+            elif operation_type == "assign_ticket":
+                success = execute_assign_ticket(approval_id)
+                if success:
+                    return {
+                        "messages": [AIMessage(content="✅ Ticket assigned successfully.")],
+                        "greeted": state.get("greeted", False),
+                        "status_filter": None,
+                        "ticket_to_summarize": None,
+                        "pending_approval_id": None,
+                        "operation_type": None
+                    }
+            elif operation_type == "add_comment":
+                success = execute_add_comment(approval_id)
+                if success:
+                    return {
+                        "messages": [AIMessage(content="✅ Comment added successfully.")],
+                        "greeted": state.get("greeted", False),
+                        "status_filter": None,
+                        "ticket_to_summarize": None,
+                        "pending_approval_id": None,
+                        "operation_type": None
+                    }
         except Exception as e:
             return {
                 "messages": [AIMessage(content=f"❌ Error executing operation: {str(e)}")],
@@ -340,7 +534,6 @@ def execute_node(state: AgentState):
                 "pending_approval_id": None,
                 "operation_type": None
             }
-        
         return state
     except Exception as e:
         logger.error("Error in execute_node: %s", e)
@@ -360,19 +553,32 @@ workflow.set_entry_point("agent")
 # Conditional routing
 def route_after_agent(state: AgentState):
     """Route after agent node based on state."""
-    if state.get("pending_approval_id") and state.get("operation_type"):
-        # Check if already approved
-        if approval_manager.is_approved(state.get("pending_approval_id")):
+    approval_id = state.get("pending_approval_id")
+    op_type = state.get("operation_type")
+
+    # 1) We detected a write operation but haven't created an approval yet
+    #    → go to approval_node to build the preview.
+    if op_type and not approval_id:
+        return "approval"
+
+    # 2) We have an approval id + operation type
+    #    If approved → execute, otherwise just end this turn and wait
+    #    for a human "approve <id>" (or UI approve button).
+    if approval_id and op_type:
+        if approval_manager.is_approved(approval_id):
             return "execute"
         else:
-            return "approval"
-    elif state.get("greeted", False):
-        return "tools"
-    elif state.get("ticket_to_summarize"):
-        return "summarizer"
-    else:
-        return END
+            # Approval exists but still pending: we've already shown the preview.
+            # Wait for explicit approve/reject command.
+            return END
 
+    # 3) Read-only paths
+    if state.get("greeted", False):
+        return "tools"
+    if state.get("ticket_to_summarize"):
+        return "summarizer"
+
+    return END
 workflow.add_conditional_edges(
     "agent",
     route_after_agent,

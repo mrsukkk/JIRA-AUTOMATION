@@ -1,5 +1,9 @@
+
+import logging
 from langchain_google_genai import ChatGoogleGenerativeAI
 from config.settings import settings
+
+logger = logging.getLogger(__name__)
 
 class LLMConfig:
     _llm_instance = None  # cache singleton
@@ -7,6 +11,7 @@ class LLMConfig:
 
     @staticmethod
     def get_llm():
+        logger.info("LLMConfig.get_llm called")
         if LLMConfig._llm_instance is None:
             LLMConfig._llm_instance = ChatGoogleGenerativeAI(
                 model=settings.MODEL_NAME,
@@ -14,8 +19,9 @@ class LLMConfig:
                 temperature=settings.TEMPERATURE
             )
             if not LLMConfig._initialized:
-                print(" Gemini initialized successfully.")
+                logger.info("Gemini initialized successfully.")
                 LLMConfig._initialized = True
+        logger.info("LLMConfig.get_llm completed")
         return LLMConfig._llm_instance
 
     
