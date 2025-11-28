@@ -297,10 +297,9 @@ async def approve_request(request_id: str, session_id: str):
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
     username = active_sessions[session_id]["username"]
-    if approval_manager.approve(request_id, approved_by=username):
-        return {"message": "Request approved successfully", "request_id": request_id}
-
-    raise HTTPException(status_code=404, detail="Approval request not found")
+    approval_manager.approve(request_id, username)
+    result = approval_manager.execute_approved_action(request_id)           
+    return {"status": "approved", "result": result}
 
 
 @web_app.post("/api/approvals/{request_id}/reject")

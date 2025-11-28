@@ -1,606 +1,830 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JIRA Agent Chatbot</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JIRA Agent Chatbot</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-        .container {
-            width: 90%;
-            max-width: 1200px;
-            height: 90vh;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
+    :root {
+      --primary: #0052CC;
+      --primary-hover: #0747A6;
+      --primary-light: #DEEBFF;
+      --secondary: #6B778C;
+      --success: #00875A;
+      --warning: #FF991F;
+      --danger: #DE350B;
+      --bg-main: #F4F5F7;
+      --bg-sidebar: #0E1420;
+      --bg-card: #FFFFFF;
+      --text-primary: #172B4D;
+      --text-secondary: #5E6C84;
+      --text-light: #8993A4;
+      --border: #DFE1E6;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --shadow-lg: 0 12px 24px rgba(0,0,0,0.12);
+      --gradient-primary: linear-gradient(135deg, #0052CC 0%, #0747A6 100%);
+      --gradient-accent: linear-gradient(135deg, #00B8D9 0%, #0052CC 100%);
+    }
 
-        .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-main);
+      color: var(--text-primary);
+      overflow: hidden;
+    }
 
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-        }
+    /* ---------- SIDEBAR ---------- */
+    .sidebar {
+      width: 320px;
+      background: var(--bg-sidebar);
+      color: #FFFFFF;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 4px 0 16px rgba(0,0,0,0.15);
+      position: relative;
+      overflow: hidden;
+    }
 
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
+    .sidebar::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 200px;
+      background: linear-gradient(135deg, rgba(0,82,204,0.2) 0%, rgba(0,184,217,0.1) 100%);
+      pointer-events: none;
+    }
 
-        .username {
-            font-weight: 500;
-        }
+    .sidebar-header {
+      padding: 32px 24px 24px;
+      position: relative;
+      z-index: 1;
+    }
 
-        .logout-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
+    .logo-area {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
 
-        .logout-btn:hover {
-            background: rgba(255, 255, 255, 0.3);
-        }
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: var(--gradient-primary);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 20px;
+      box-shadow: 0 4px 12px rgba(0,82,204,0.3);
+    }
 
-        .chat-container {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
+    .sidebar h2 {
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
 
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-            background: #f8f9fa;
-        }
+    .sidebar-subtitle {
+      font-size: 13px;
+      color: #8993A4;
+      margin-top: 4px;
+    }
 
-        .message {
-            margin-bottom: 15px;
-            display: flex;
-            animation: fadeIn 0.3s;
-        }
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 24px 24px;
+      position: relative;
+      z-index: 1;
+    }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+    .sidebar-content::-webkit-scrollbar {
+      width: 6px;
+    }
 
-        .message.user {
-            justify-content: flex-end;
-        }
+    .sidebar-content::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
-        .message.assistant {
-            justify-content: flex-start;
-        }
+    .sidebar-content::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.2);
+      border-radius: 3px;
+    }
 
-        .message-content {
-            max-width: 70%;
-            padding: 12px 16px;
-            border-radius: 18px;
-            word-wrap: break-word;
-            white-space: pre-wrap;
-        }
+    .section {
+      margin-bottom: 32px;
+      animation: fadeInUp 0.5s ease-out;
+    }
 
-        .message.user .message-content {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
-        .message.assistant .message-content {
-            background: white;
-            color: #333;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
+    .section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 16px;
+      color: #8993A4;
+    }
 
-        .approval-box {
-            background: #fff3cd;
-            border: 2px solid #ffc107;
-            border-radius: 12px;
-            padding: 15px;
-            margin: 10px 0;
-        }
+    .input-group {
+      margin-bottom: 16px;
+    }
 
-        .approval-box h3 {
-            color: #856404;
-            margin-bottom: 10px;
-            font-size: 16px;
-        }
+    label {
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+      display: block;
+      color: #B8C1D1;
+    }
 
-        .approval-preview {
-            background: white;
-            padding: 10px;
-            border-radius: 8px;
-            margin: 10px 0;
-            font-size: 14px;
-            color: #333;
-        }
+    input[type="text"], input[type="password"] {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      background: rgba(255,255,255,0.05);
+      color: #FFFFFF;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    }
 
-        .approval-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 10px;
-        }
+    input[type="text"]:focus, input[type="password"]:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: rgba(255,255,255,0.08);
+      box-shadow: 0 0 0 3px rgba(0,82,204,0.15);
+    }
 
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.3s;
-        }
+    button {
+      padding: 10px 18px;
+      background: var(--gradient-primary);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      width: 100%;
+      box-shadow: 0 2px 8px rgba(0,82,204,0.3);
+    }
 
-        .btn-approve {
-            background: #28a745;
-            color: white;
-        }
+    button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,82,204,0.4);
+    }
 
-        .btn-approve:hover {
-            background: #218838;
-        }
+    button:active {
+      transform: translateY(0);
+    }
 
-        .btn-reject {
-            background: #dc3545;
-            color: white;
-        }
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      box-shadow: none;
+    }
 
-        .btn-reject:hover {
-            background: #c82333;
-        }
+    .btn-secondary:hover {
+      background: rgba(255,255,255,0.15);
+    }
 
-        .input-container {
-            padding: 20px;
-            background: white;
-            border-top: 1px solid #e0e0e0;
-            display: flex;
-            gap: 10px;
-        }
+    code {
+      display: inline-block;
+      background: rgba(0,82,204,0.15);
+      padding: 4px 8px;
+      border-radius: 6px;
+      margin: 4px 0;
+      color: #4C9AFF;
+      font-size: 12px;
+      font-family: 'Courier New', monospace;
+      border: 1px solid rgba(76,154,255,0.2);
+    }
 
-        .input-field {
-            flex: 1;
-            padding: 12px 16px;
-            border: 2px solid #e0e0e0;
-            border-radius: 25px;
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.3s;
-        }
+    .small {
+      font-size: 12px;
+      color: #8993A4;
+      line-height: 1.6;
+    }
 
-        .input-field:focus {
-            border-color: #667eea;
-        }
+    .command-list {
+      margin-top: 8px;
+    }
 
-        .send-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: transform 0.2s;
-        }
+    .command-category {
+      margin-bottom: 16px;
+    }
 
-        .send-btn:hover {
-            transform: scale(1.05);
-        }
+    .command-category b {
+      color: #4C9AFF;
+      font-size: 13px;
+    }
 
-        .send-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-            transform: none;
-        }
+    #auth-status {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      background: rgba(0,135,90,0.15);
+      border: 1px solid rgba(0,135,90,0.3);
+      color: #57D9A3;
+      font-weight: 500;
+      text-align: center;
+      display: none;
+    }
 
-        .login-container {
-            width: 90%;
-            max-width: 400px;
-            background: white;
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        }
+    #auth-status.error {
+      background: rgba(222,53,11,0.15);
+      border-color: rgba(222,53,11,0.3);
+      color: #FF7452;
+    }
 
-        .login-container h1 {
-            text-align: center;
-            margin-bottom: 30px;
-            color: #333;
-        }
+    /* ---------- MAIN AREA ---------- */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 32px;
+      width: 100%;
+    }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
+    .main-header {
+      margin-bottom: 24px;
+    }
 
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            color: #555;
-            font-weight: 500;
-        }
+    .main-header h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
 
-        .form-group input {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.3s;
-        }
+    .main-header p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
 
-        .form-group input:focus {
-            border-color: #667eea;
-        }
+    /* ---------- CHAT WINDOW ---------- */
+    .chat-window {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      box-shadow: var(--shadow-md);
+      position: relative;
+    }
 
-        .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
+    .chat-window::-webkit-scrollbar {
+      width: 8px;
+    }
 
-        .form-actions button {
-            flex: 1;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
+    .chat-window::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
+    .chat-window::-webkit-scrollbar-thumb {
+      background: #DFE1E6;
+      border-radius: 4px;
+    }
 
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
+    .chat-window::-webkit-scrollbar-thumb:hover {
+      background: #C1C7D0;
+    }
 
-        .btn-secondary {
-            background: #f8f9fa;
-            color: #333;
-            border: 1px solid #e0e0e0;
-        }
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--text-secondary);
+      text-align: center;
+    }
 
-        .btn-secondary:hover {
-            background: #e9ecef;
-        }
+    .empty-state-icon {
+      width: 80px;
+      height: 80px;
+      background: var(--primary-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      font-size: 36px;
+    }
 
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
+    .msg-user, .msg-bot {
+      margin-bottom: 20px;
+      display: flex;
+      animation: slideIn 0.3s ease-out;
+    }
 
-        .loading {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+    .msg-user {
+      justify-content: flex-end;
+    }
+
+    .msg-bot {
+      justify-content: flex-start;
+    }
+
+    .bubble {
+      max-width: 75%;
+      padding: 14px 18px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      position: relative;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .bubble-user {
+      background: var(--gradient-primary);
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .bubble-bot {
+      background: #F4F5F7;
+      color: var(--text-primary);
+      border-bottom-left-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* ---------- CHAT INPUT BAR ---------- */
+    .chat-input-wrapper {
+      margin-top: 20px;
+      position: relative;
+    }
+
+    .chat-input {
+      display: flex;
+      background: var(--bg-card);
+      padding: 16px;
+      border-radius: 16px;
+      box-shadow: var(--shadow-lg);
+      border: 2px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .chat-input:focus-within {
+      border-color: var(--primary);
+      box-shadow: 0 8px 24px rgba(0,82,204,0.15);
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      font-size: 14px;
+      transition: all 0.3s ease;
+      background: var(--bg-main);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+      color: var(--text-primary);
+    }
+
+    .chat-input input:focus {
+      outline: none;
+      border-color: var(--primary);
+      background: white;
+    }
+
+    .chat-input button {
+      margin-left: 12px;
+      padding: 12px 24px;
+      font-size: 14px;
+      width: auto;
+      box-shadow: 0 2px 8px rgba(0,82,204,0.3);
+    }
+
+    /* ---------- APPROVAL CARDS ---------- */
+    .approval-card {
+      border-left: 4px solid var(--warning);
+      background: linear-gradient(to right, #FFF4E6, #FFFFFF);
+      padding: 16px;
+      border-radius: 12px;
+      margin: 16px 0;
+      box-shadow: var(--shadow-sm);
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .approval-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .approval-badge {
+      background: var(--warning);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .approval-card h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin: 0;
+    }
+
+    .approval-card pre {
+      margin: 12px 0;
+      background: #F4F5F7;
+      padding: 12px;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      font-size: 12px;
+      border: 1px solid var(--border);
+      overflow-x: auto;
+    }
+
+    .approval-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .approval-actions button {
+      width: auto;
+      padding: 8px 16px;
+      font-size: 13px;
+    }
+
+    .btn-approve {
+      background: var(--success);
+      box-shadow: 0 2px 8px rgba(0,135,90,0.3);
+    }
+
+    .btn-approve:hover {
+      background: #006644;
+    }
+
+    .btn-reject {
+      background: var(--danger);
+      box-shadow: 0 2px 8px rgba(222,53,11,0.3);
+    }
+
+    .btn-reject:hover {
+      background: #BF2600;
+    }
+
+    .approval-mini {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ---------- LOADING STATES ---------- */
+    .loading {
+      display: inline-block;
+      width: 4px;
+      height: 4px;
+      background: currentColor;
+      border-radius: 50%;
+      animation: loading 1.4s infinite;
+      margin: 0 2px;
+    }
+
+    .loading:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .loading:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes loading {
+      0%, 80%, 100% {
+        opacity: 0.3;
+        transform: scale(0.8);
+      }
+      40% {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* ---------- RESPONSIVE ---------- */
+    @media (max-width: 768px) {
+      .sidebar {
+        width: 280px;
+      }
+
+      .main {
+        padding: 16px;
+      }
+    }
+  </style>
 </head>
+
 <body>
-    <!-- Login Screen -->
-    <div id="loginScreen" class="login-container">
-        <h1>JIRA Agent Chatbot</h1>
-        <div id="errorMessage" class="error-message"></div>
-        <div class="form-group">
-            <label for="username">Username</label>
-            <input type="text" id="username" placeholder="Enter username" required>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-area">
+        <div class="logo-icon">J</div>
+        <div>
+          <h2>JIRA Agent</h2>
+          <div class="sidebar-subtitle">AI-Powered Automation</div>
         </div>
-        <div class="form-group">
-            <label for="password">Password</label>
-            <input type="password" id="password" placeholder="Enter password" required>
-        </div>
-        <div class="form-actions">
-            <button class="btn btn-primary" onclick="login()">Login</button>
-            <button class="btn btn-secondary" onclick="showRegister()">Register</button>
-        </div>
+      </div>
     </div>
 
-    <!-- Register Screen -->
-    <div id="registerScreen" class="login-container" style="display: none;">
-        <h1>Register</h1>
-        <div id="registerErrorMessage" class="error-message"></div>
-        <div class="form-group">
-            <label for="regUsername">Username</label>
-            <input type="text" id="regUsername" placeholder="Enter username" required>
+    <div class="sidebar-content">
+      <div class="section">
+        <h3>Authentication</h3>
+        <div class="input-group">
+          <label>Username</label>
+          <input id="username" type="text" placeholder="Enter username" />
         </div>
-        <div class="form-group">
-            <label for="regPassword">Password</label>
-            <input type="password" id="regPassword" placeholder="Enter password" required>
+        <div class="input-group">
+          <label>Password</label>
+          <input id="password" type="password" placeholder="Enter password" />
         </div>
-        <div class="form-group">
-            <label for="regEmail">Email (Optional)</label>
-            <input type="email" id="regEmail" placeholder="Enter email">
+        <button onclick="login()">Login</button>
+        <div id="auth-status"></div>
+      </div>
+
+      <div class="section">
+        <h3>Command Reference</h3>
+        <div class="small command-list">
+          <div class="command-category">
+            <b>Read Operations</b><br>
+            <code>show my tickets</code><br>
+            <code>show tickets with status In Progress</code><br>
+            <code>summarize ticket ESD-123</code>
+          </div>
+
+          <div class="command-category">
+            <b>Write Operations</b><br>
+            <code>create ticket in ESD</code><br>
+            <code>update ticket ESD-123</code><br>
+            <code>transition ticket ESD-123 to "In Progress"</code><br>
+            <code>assign ticket ESD-123 to "john.doe"</code><br>
+            <code>comment on ticket ESD-123</code>
+          </div>
+
+          <div class="command-category">
+            <b>Approval Actions</b><br>
+            <code>approve &lt;id&gt;</code><br>
+            <code>reject &lt;id&gt;</code>
+          </div>
         </div>
-        <div class="form-actions">
-            <button class="btn btn-primary" onclick="register()">Register</button>
-            <button class="btn btn-secondary" onclick="showLogin()">Back to Login</button>
-        </div>
+      </div>
+
+      <div class="section">
+        <h3>Pending Approvals</h3>
+        <button class="btn-secondary" onclick="loadApprovals()">Refresh List</button>
+        <div id="approvals-list" class="small"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN AREA -->
+  <div class="main">
+    <div class="main-header">
+      <h1>Chat Interface</h1>
+      <p>Interact with JIRA using natural language commands</p>
     </div>
 
-    <!-- Chat Interface -->
-    <div id="chatScreen" class="container" style="display: none;">
-        <div class="header">
-            <h1>🤖 JIRA Agent Chatbot</h1>
-            <div class="user-info">
-                <span class="username" id="displayUsername"></span>
-                <button class="logout-btn" onclick="logout()">Logout</button>
-            </div>
-        </div>
-        <div class="chat-container">
-            <div class="messages" id="messages"></div>
-            <div class="input-container">
-                <input type="text" id="messageInput" class="input-field" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-                <button class="send-btn" id="sendBtn" onclick="sendMessage()">Send</button>
-            </div>
-        </div>
+    <!-- CHAT WINDOW -->
+    <div id="chat-window" class="chat-window">
+      <div class="empty-state">
+        <div class="empty-state-icon">💬</div>
+        <h3>Start a conversation</h3>
+        <p>Type a command below to interact with JIRA</p>
+      </div>
     </div>
 
-    <script>
-        let sessionId = null;
-        let username = null;
+    <!-- INPUT BAR -->
+    <div class="chat-input-wrapper">
+      <div class="chat-input">
+        <input id="chat-input" type="text" placeholder="Type a canonical command..." onkeypress="if(event.key==='Enter') sendMessage()" />
+        <button onclick="sendMessage()">Send</button>
+      </div>
+    </div>
+  </div>
 
-        function showError(elementId, message) {
-            const errorEl = document.getElementById(elementId);
-            errorEl.textContent = message;
-            errorEl.style.display = 'block';
-            setTimeout(() => {
-                errorEl.style.display = 'none';
-            }, 5000);
+  <script>
+    let sessionId = null;
+    let username = null;
+    let firstMessage = true;
+
+    /* ---------- MESSAGE RENDERER ---------- */
+    function appendMessage(role, text) {
+      const win = document.getElementById("chat-window");
+
+      if (firstMessage) {
+        win.innerHTML = '';
+        firstMessage = false;
+      }
+
+      const wrapper = document.createElement("div");
+      wrapper.className = (role === "user") ? "msg-user" : "msg-bot";
+
+      const bubble = document.createElement("div");
+      bubble.className = "bubble " + (role === "user" ? "bubble-user" : "bubble-bot");
+      bubble.textContent = text;
+
+      wrapper.appendChild(bubble);
+      win.appendChild(wrapper);
+
+      win.scrollTop = win.scrollHeight;
+    }
+
+    /* ---------- LOGIN ---------- */
+    async function login() {
+      let u = document.getElementById("username").value;
+      let p = document.getElementById("password").value;
+
+      const status = document.getElementById("auth-status");
+      status.style.display = 'block';
+      status.className = '';
+      status.textContent = 'Logging in...';
+
+      try {
+        const resp = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: u, password: p }),
+        });
+
+        const data = await resp.json();
+
+        if (!resp.ok) {
+          status.className = 'error';
+          status.textContent = "Login failed!";
+          return;
         }
 
-        function showLogin() {
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('registerScreen').style.display = 'none';
+        sessionId = data.session_id;
+        username = data.username;
+        status.className = '';
+        status.textContent = "✓ Logged in as " + username;
+      } catch (e) {
+        status.className = 'error';
+        status.textContent = "Error: " + e;
+      }
+    }
+
+    /* ---------- SEND MESSAGE ---------- */
+    async function sendMessage() {
+      const input = document.getElementById("chat-input");
+      const text = input.value.trim();
+
+      if (!text || !sessionId) return;
+
+      appendMessage("user", text);
+      input.value = "";
+
+      try {
+        const resp = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, session_id: sessionId }),
+        });
+
+        const data = await resp.json();
+        appendMessage("bot", data.response || "");
+
+        if (data.pending_approval) {
+          renderApprovalInline(data.pending_approval);
         }
 
-        function showRegister() {
-            document.getElementById('loginScreen').style.display = 'none';
-            document.getElementById('registerScreen').style.display = 'block';
-        }
+        loadApprovals();
+      } catch (e) {
+        appendMessage("bot", "Error: " + e);
+      }
+    }
 
-        async function register() {
-            const username = document.getElementById('regUsername').value;
-            const password = document.getElementById('regPassword').value;
-            const email = document.getElementById('regEmail').value;
+    /* ---------- INLINE APPROVAL CARD ---------- */
+    function renderApprovalInline(a) {
+      const win = document.getElementById("chat-window");
+      const card = document.createElement("div");
+      card.className = "approval-card";
+      card.innerHTML = `
+        <div class="approval-card-header">
+          <span class="approval-badge">Approval Required</span>
+        </div>
+        <h4>${a.operation_type}</h4>
+        <pre>${JSON.stringify(a.preview, null, 2)}</pre>
+        <div class="approval-actions">
+          <button class="btn-approve" onclick="approve('${a.request_id}')">✓ Approve</button>
+          <button class="btn-reject" onclick="reject('${a.request_id}')">✗ Reject</button>
+        </div>
+        <div class="approval-mini">Request ID: ${a.request_id}</div>
+      `;
+      win.appendChild(card);
+      win.scrollTop = win.scrollHeight;
+    }
 
-            if (!username || !password) {
-                showError('registerErrorMessage', 'Username and password are required');
-                return;
-            }
+    async function approve(id) {
+        const resp = await fetch(`/api/approvals/${id}/approve?session_id=${sessionId}`, {
+            method: "POST"
+        });
 
-            try {
-                const response = await fetch('/api/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password, email })
-                });
+        const data = await resp.json();
 
-                if (response.ok) {
-                    alert('Registration successful! Please login.');
-                    showLogin();
-                } else {
-                    const data = await response.json();
-                    showError('registerErrorMessage', data.detail || 'Registration failed');
-                }
-            } catch (error) {
-                showError('registerErrorMessage', 'Error: ' + error.message);
-            }
-        }
+        appendMessage("user", `Approved request ${id}`);
+        appendMessage("bot", data.result || "Action executed successfully.");
+        
+        // Refresh the approvals list
+        loadApprovals();
+}
 
-        async function login() {
-            const usernameInput = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
 
-            if (!usernameInput || !password) {
-                showError('errorMessage', 'Username and password are required');
-                return;
-            }
+    async function reject(id) {
+      await fetch(`/api/approvals/${id}/reject?session_id=${sessionId}`, { method: "POST" });
+      appendMessage("user", `reject ${id}`);
+      setTimeout(() => sendMessage(), 100);
+    }
 
-            try {
-                const response = await fetch('/api/auth/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: usernameInput, password })
-                });
+    /* ---------- SIDEBAR APPROVAL LIST ---------- */
+    async function loadApprovals() {
+      const list = document.getElementById("approvals-list");
+      if (!sessionId) { 
+        list.innerHTML = '<p style="margin-top: 12px; color: #8993A4;">Login to view approvals</p>';
+        return; 
+      }
 
-                if (response.ok) {
-                    const data = await response.json();
-                    sessionId = data.session_id;
-                    username = data.username;
-                    
-                    document.getElementById('loginScreen').style.display = 'none';
-                    document.getElementById('chatScreen').style.display = 'flex';
-                    document.getElementById('displayUsername').textContent = username;
-                    
-                    addMessage('assistant', 'Welcome! I\'m your JIRA agent. How can I help you today?');
-                } else {
-                    const data = await response.json();
-                    showError('errorMessage', data.detail || 'Login failed');
-                }
-            } catch (error) {
-                showError('errorMessage', 'Error: ' + error.message);
-            }
-        }
+      const resp = await fetch(`/api/approvals/pending?session_id=${sessionId}`);
+      const data = await resp.json();
 
-        async function logout() {
-            if (sessionId) {
-                await fetch('/api/auth/logout', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-            }
-            
-            sessionId = null;
-            username = null;
-            document.getElementById('chatScreen').style.display = 'none';
-            document.getElementById('loginScreen').style.display = 'block';
-            document.getElementById('messages').innerHTML = '';
-        }
+      if (!data.approvals || data.approvals.length === 0) {
+        list.innerHTML = '<p style="margin-top: 12px; color: #57D9A3;">✓ No pending approvals</p>';
+        return;
+      }
 
-        function addMessage(role, content, approvalInfo = null) {
-            const messagesDiv = document.getElementById('messages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${role}`;
-            
-            const contentDiv = document.createElement('div');
-            contentDiv.className = 'message-content';
-            contentDiv.textContent = content;
-            
-            messageDiv.appendChild(contentDiv);
-            
-            if (approvalInfo) {
-                const approvalBox = document.createElement('div');
-                approvalBox.className = 'approval-box';
-                approvalBox.innerHTML = `
-                    <h3>⚠️ Approval Required - ${approvalInfo.operation_type.toUpperCase()}</h3>
-                    <div class="approval-preview">
-                        <strong>Request ID:</strong> ${approvalInfo.request_id}<br>
-                        ${approvalInfo.ticket_key ? `<strong>Ticket:</strong> ${approvalInfo.ticket_key}<br>` : ''}
-                        <strong>Preview:</strong><br>
-                        ${JSON.stringify(approvalInfo.preview, null, 2).replace(/\n/g, '<br>')}
-                    </div>
-                    <div class="approval-actions">
-                        <button class="btn btn-approve" onclick="approveRequest('${approvalInfo.request_id}')">Approve</button>
-                        <button class="btn btn-reject" onclick="rejectRequest('${approvalInfo.request_id}')">Reject</button>
-                    </div>
-                `;
-                messageDiv.appendChild(approvalBox);
-            }
-            
-            messagesDiv.appendChild(messageDiv);
-            messagesDiv.scrollTop = messagesDiv.scrollHeight;
-        }
+      list.innerHTML = "";
+      data.approvals.forEach(a => {
+        const card = document.createElement("div");
+        card.className = "approval-card";
+        card.style.marginTop = "12px";
+        card.innerHTML = `
+          <div class="approval-card-header">
+            <span class="approval-badge">${a.operation_type}</span>
+          </div>
+          <pre>${JSON.stringify(a.preview, null, 2)}</pre>
+          <div class="approval-actions">
+            <button class="btn-approve" onclick="approve('${a.request_id}')">✓</button>
+            <button class="btn-reject" onclick="reject('${a.request_id}')">✗</button>
+          </div>
+        `;
+        list.appendChild(card);
+      });
+    }
+  </script>
 
-        async function sendMessage() {
-            const input = document.getElementById('messageInput');
-            const message = input.value.trim();
-            
-            if (!message || !sessionId) return;
-            
-            addMessage('user', message);
-            input.value = '';
-            
-            const sendBtn = document.getElementById('sendBtn');
-            sendBtn.disabled = true;
-            sendBtn.innerHTML = '<span class="loading"></span>';
-            
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, session_id: sessionId })
-                });
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    addMessage('assistant', data.response, data.pending_approval);
-                } else {
-                    const error = await response.json();
-                    addMessage('assistant', 'Error: ' + (error.detail || 'Failed to process message'));
-                }
-            } catch (error) {
-                addMessage('assistant', 'Error: ' + error.message);
-            } finally {
-                sendBtn.disabled = false;
-                sendBtn.textContent = 'Send';
-            }
-        }
-
-        async function approveRequest(requestId) {
-            try {
-                const response = await fetch(`/api/approvals/${requestId}/approve`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId })
-                });
-                
-                if (response.ok) {
-                    addMessage('assistant', `✅ Approval granted. Executing operation...`);
-                    // Send approve command to chat
-                    document.getElementById('messageInput').value = `approve ${requestId}`;
-                    sendMessage();
-                } else {
-                    const error = await response.json();
-                    addMessage('assistant', 'Error: ' + (error.detail || 'Failed to approve'));
-                }
-            } catch (error) {
-                addMessage('assistant', 'Error: ' + error.message);
-            }
-        }
-
-        async function rejectRequest(requestId) {
-            const reason = prompt('Reason for rejection (optional):') || '';
-            try {
-                const response = await fetch(`/api/approvals/${requestId}/reject`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ session_id: sessionId, reason })
-                });
-                
-                if (response.ok) {
-                    addMessage('assistant', `❌ Operation rejected.`);
-                } else {
-                    const error = await response.json();
-                    addMessage('assistant', 'Error: ' + (error.detail || 'Failed to reject'));
-                }
-            } catch (error) {
-                addMessage('assistant', 'Error: ' + error.message);
-            }
-        }
-
-        function handleKeyPress(event) {
-            if (event.key === 'Enter') {
-                sendMessage();
-            }
-        }
-    </script>
 </body>
 </html>
-

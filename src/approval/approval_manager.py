@@ -7,6 +7,15 @@ from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
 from datetime import datetime
 from enum import Enum
+from tools.jira_tool import get_jira_client as JiraTool
+from tools.jira_operations import (
+    create_ticket,
+    update_ticket,
+    transition_ticket,
+    assign_ticket,
+    add_comment
+)
+jira_tool = JiraTool()
 
 logger = logging.getLogger(__name__)
 
@@ -200,6 +209,87 @@ class ApprovalManager:
         result = list(self.pending_approvals.values())
         logger.info("ApprovalManager.get_pending_approvals completed")
         return result
+
+    def execute_approved_action(self, request_id: str):
+        """
+        Execute the stored Jira action after approval.
+        """
+        approval: ApprovalRequest = None
+
+        # Approval is already moved to history once approved
+        for item in self.approval_history:
+            if item.request_id == request_id:
+                approval = item
+                break
+
+        if not approval:
+            logger.warning(f"No approved request found for execution: {request_id}")
+            return "Error: No such approved request."
+
+        op = approval.operation_type
+        ticket_key = approval.ticket_key
+        preview = approval.preview  # contains the inputs (comment, assignee, etc.)
+
+        logger.info(f"Executing approved operation={op} for ticket={ticket_key} preview={preview}")
+
+        try:
+            # ============================
+            # 1. ADD COMMENT
+            # ============================
+            if op == "add_comment":
+                result = add_comment(
+                    ticket_key,
+                    preview.get("comment")
+                )
+                return f"Comment added to {ticket_key}"
+
+            # ============================
+            # 2. TRANSITION STATUS
+            # ============================
+            elif op == "transition_ticket":
+                result = transition_ticket(
+                    ticket_key,
+                    preview.get("target_status")
+                )
+                return f"Ticket {ticket_key} transitioned to {preview.get('target_status')}"
+
+            # ============================
+            # 3. ASSIGN TICKET
+            # ============================
+            elif op == "assign_ticket":
+                result = assign_ticket(
+                    ticket_key,
+                    preview.get("assignee")
+                )
+                return f"Ticket {ticket_key} assigned to {preview.get('assignee')}"
+
+            # ============================
+            # 4. UPDATE SUMMARY
+            # ============================
+            elif op == "update_summary":
+                result = update_ticket(
+                    ticket_key,
+                    summary=preview.get("summary")
+                )
+                return f"Summary updated for {ticket_key}"
+
+            # ============================
+            # 5. CREATE TICKET
+            # ============================
+            elif op == "create_ticket":
+                result = create_ticket(
+                    project_key=preview.get("project_key"),
+                    summary=preview.get("summary"),
+                    description=preview.get("description")
+                )
+                return f"Ticket created: {result}"
+
+            else:
+                return f"Unknown operation type: {op}"
+
+        except Exception as e:
+            logger.error(f"Error executing approved action: {e}")
+            return f"Error executing action: {str(e)}"
 
 
 # Global approval manager instance

@@ -45,85 +45,56 @@ def get_jira_client():
 def fetch_tickets_by_status(status: str = None):
     logger.info("fetch_tickets_by_status called with status=%s", status)
     """
-    Fetch tickets assigned to, reported by, or mentioning the current user.
+    Fetch tickets assigned to or reported by the current user.
     Optionally filter by status (e.g., 'Closed', 'In Progress').
-    Returns a human-readable string grouped by role.
+    Returns a clean multiline string for UI display.
     """
-    logger.info("Fetching tickets with status: %s", status if status else "All")
     try:
         jira = get_jira_client()
         current_user = jira.current_user()
-        logger.debug("Current user: %s", current_user)
         profile = jira.user(current_user)
         display_name = profile.displayName
-        account_id = profile.raw.get('accountId')  # Correctly access accountId from raw JSON
         logger.info("User display name: %s", display_name)
 
-        # JQL queries for assigned, reported, and mentioned tickets
+        # Build JQL
         status_clause = f" AND status = '{status}'" if status else ""
+
         assigned_jql = f"assignee = currentUser(){status_clause} ORDER BY updated DESC"
         reported_jql = f"reporter = currentUser(){status_clause} ORDER BY updated DESC"
-        # all_issues_jql = f'text ~ "{display_name}"{status_clause} ORDER BY updated DESC'
 
         # Fetch tickets
-        logger.debug("Fetching assigned tickets with JQL: %s", assigned_jql)
         assigned_issues = jira.search_issues(assigned_jql, maxResults=None)
-        logger.info("Found %d assigned tickets", len(assigned_issues))
-        
-        logger.debug("Fetching reported tickets with JQL: %s", reported_jql)
         reported_issues = jira.search_issues(reported_jql, maxResults=None)
-        logger.info("Found %d reported tickets", len(reported_issues))
 
-        # Fetch mentioned tickets
-        # mentioned_issues = []
-        # start_at = 0
-        # batch_size = 50
-        # logger.debug("Fetching mentioned tickets with JQL: %s", all_issues_jql)
-        # while True:
-        #     issues = jira.search_issues(all_issues_jql, startAt=start_at, maxResults=batch_size, fields="summary,status,comment")
-        #     if not issues:
-        #         logger.debug("No more issues to fetch for mentioned tickets")
-        #         break
-        #     for issue in issues:
-        #         if issue in assigned_issues or issue in reported_issues:
-        #             continue
-        #         comments = getattr(issue.fields, "comment", {}).comments or []
-        #         for comment in comments:
-        #             if f"[~accountid:{account_id}]" in comment.body.lower():
-        #                 mentioned_issues.append(issue)
-        #                 logger.debug("Found mentioned ticket: %s", issue.key)
-        #                 break
-        #     start_at += batch_size
-        # logger.info("Found %d mentioned tickets", len(mentioned_issues))
+        def format_issue_list(issues):
+            """Format issue list cleanly with bullets."""
+            lines = []
+            for i, issue in enumerate(issues, start=1):
+                key = issue.key
+                summary = issue.fields.summary
+                status_name = issue.fields.status.name
+                lines.append(f"  {i}. [{key}] {summary} (Status: {status_name})")
+            return lines
 
-        # Helper function to format issues
-        def format_issues(issues):
-            return [
-                f"[{issue.key}] {issue.fields.summary} (Status: {issue.fields.status.name})"
-                for issue in issues
-            ]
+        output = ""
 
-        # Build output
-        output_lines = []
+        # Assigned to you
         if assigned_issues:
-            output_lines.append("🔹 Assigned to You:")
-            output_lines.extend(f"  {i+1}. {line}" for i, line in enumerate(format_issues(assigned_issues)))
-        if reported_issues:
-            output_lines.append("\n🔹 Reported by You:")
-            output_lines.extend(f"  {i+1}. {line}" for i, line in enumerate(format_issues(reported_issues)))
-        # if mentioned_issues:
-        #     output_lines.append("\n🔹 You are Mentioned in:")
-        #     output_lines.extend(f"  {i+1}. {line}" for i, line in enumerate(format_issues(mentioned_issues)))
+            output += "🔹 Assigned to You:\n"
+            output += "\n".join(format_issue_list(assigned_issues)) + "\n\n"
 
-        if output_lines:
-            logger.info("Tickets fetched successfully")
-            logger.info("fetch_tickets_by_status completed with tickets found")
-            return "\n".join(output_lines)
-        else:
-            message = f"No tickets found for status '{status}'." if status else "No tickets found."
-            logger.info(message)
-            logger.info("fetch_tickets_by_status completed with no tickets found")
-            return message
+        # Reported by you
+        if reported_issues:
+            output += "🔹 Reported by You:\n"
+            output += "\n".join(format_issue_list(reported_issues)) + "\n\n"
+
+        # Nothing found
+        if not output.strip():
+            output = f"No tickets found for status '{status}'." if status else "No tickets found."
+
+        logger.info("fetch_tickets_by_status completed successfully")
+        return output.strip()
+
     except Exception as e:
         logger.error("Error fetching tickets: %s", e)
         raise
